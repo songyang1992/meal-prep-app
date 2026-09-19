@@ -7,13 +7,14 @@ import StickyHeader from './sections/StickyHeader'
 import ParamPanel from './sections/ParamPanel'
 import NutritionSection from './sections/NutritionSection'
 import ShoppingSection from './sections/ShoppingSection'
+import type { ItemOverride } from './sections/ShoppingSection'
 import PrepSection from './sections/PrepSection'
 import RecipesSection from './sections/RecipesSection'
 import BoxesSection from './sections/BoxesSection'
 import StorageSection from './sections/StorageSection'
 
 const LS_INPUT = 'mealprep.input.v1'
-const LS_PRICES = 'mealprep.prices.v1'
+const LS_ITEMS = 'mealprep.items.v1'
 const LS_CHECKED = 'mealprep.checked.v1'
 
 function loadJSON<T>(key: string, fallback: T): T {
@@ -47,11 +48,34 @@ function loadInput(): UserInput {
   }
 }
 
+// 读取规格/份数/单价改动；同时把旧 key（mealprep.prices / mealprep.prices.v1，Record<id, number>）迁移合并后删除
+function loadItemOverrides(): Record<string, ItemOverride> {
+  let merged: Record<string, ItemOverride> = {}
+  try {
+    const raw = localStorage.getItem(LS_ITEMS)
+    if (raw) merged = JSON.parse(raw) as Record<string, ItemOverride>
+  } catch {
+    merged = {}
+  }
+  for (const legacy of ['mealprep.prices', 'mealprep.prices.v1']) {
+    try {
+      const raw = localStorage.getItem(legacy)
+      if (!raw) continue
+      const prices = JSON.parse(raw) as Record<string, number>
+      for (const [id, p] of Object.entries(prices)) {
+        if (typeof p === 'number' && isFinite(p)) merged[id] = { ...merged[id], price: p }
+      }
+      localStorage.removeItem(legacy)
+    } catch {
+      /* 忽略坏数据 */
+    }
+  }
+  return merged
+}
+
 export default function App() {
   const [input, setInput] = useState<UserInput>(loadInput)
-  const [priceOverrides, setPriceOverrides] = useState<Record<string, number>>(() =>
-    loadJSON(LS_PRICES, {} as Record<string, number>),
-  )
+  const [itemOverrides, setItemOverrides] = useState<Record<string, ItemOverride>>(loadItemOverrides)
   const [checked, setChecked] = useState<Record<string, boolean>>(() =>
     loadJSON(LS_CHECKED, {} as Record<string, boolean>),
   )
@@ -60,8 +84,8 @@ export default function App() {
     localStorage.setItem(LS_INPUT, JSON.stringify(input))
   }, [input])
   useEffect(() => {
-    localStorage.setItem(LS_PRICES, JSON.stringify(priceOverrides))
-  }, [priceOverrides])
+    localStorage.setItem(LS_ITEMS, JSON.stringify(itemOverrides))
+  }, [itemOverrides])
   useEffect(() => {
     localStorage.setItem(LS_CHECKED, JSON.stringify(checked))
   }, [checked])
@@ -81,7 +105,8 @@ export default function App() {
   const daily = useMemo(() => computeDaily(input), [input])
   const extras = useMemo(() => computeExtras(input), [input])
   const meals = useMemo(() => computeMeals(daily, input.lunchShare, extras), [daily, input.lunchShare, extras])
-  const shopping = useMemo(() => buildShoppingList(daily, extras, priceOverrides), [daily, extras, priceOverrides])
+  // calc 层保持纯净：不带任何 override，规格/份数/单价的改动在 UI 层应用
+  const shopping = useMemo(() => buildShoppingList(daily, extras), [daily, extras])
   const boxes = useMemo(() => buildBoxPlans(meals), [meals])
 
   return (
@@ -129,7 +154,9 @@ export default function App() {
             shopping={shopping}
             checked={checked}
             onToggleChecked={(id) => setChecked((p) => ({ ...p, [id]: !p[id] }))}
-            onPrice={(id, v) => setPriceOverrides((p) => ({ ...p, [id]: v }))}
+            overrides={itemOverrides}
+            onOverride={(id, patch) => setItemOverrides((p) => ({ ...p, [id]: { ...p[id], ...patch } }))}
+            onResetOverrides={() => setItemOverrides({})}
             weeklyOil={daily.fat * 7}
           />
           <PrepSection />
