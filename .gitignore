@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# 验证脚本构建产物
+scripts/.verify-input.bundle.mjs

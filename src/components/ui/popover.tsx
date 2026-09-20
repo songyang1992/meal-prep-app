@@ -34,9 +34,7 @@ function PopoverContent({
           className
         )}
         {...props}
-      >
-        {children}
-      </PopoverPrimitive.Content>
+      />
     </PopoverPrimitive.Portal>
   )
 }
