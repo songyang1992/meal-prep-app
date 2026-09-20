@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
@@ -53,6 +54,31 @@ function RatioSlider({
   )
 }
 
+// 体重输入：focus-aware raw text，聚焦期间显示原始输入不回写，blur 时夹取 40–120 并提交
+export function WeightInput({ weight, onWeight }: { weight: number; onWeight: (kg: number) => void }) {
+  const [draft, setDraft] = useState<string | null>(null)
+  return (
+    <Input
+      inputMode="decimal"
+      className="tnum h-8 w-20 text-right"
+      value={draft ?? String(weight)}
+      onFocus={(e) => setDraft(e.target.value)}
+      onChange={(e) => {
+        const raw = e.target.value
+        setDraft(raw)
+        const v = parseFloat(raw)
+        if (!isNaN(v) && v >= 40 && v <= 120) onWeight(v) // 范围内的值实时生效；范围外等 blur 夹取
+      }}
+      onBlur={() => {
+        if (draft === null) return
+        const v = parseFloat(draft)
+        if (!isNaN(v)) onWeight(Math.min(120, Math.max(40, v)))
+        setDraft(null)
+      }}
+    />
+  )
+}
+
 export default function ParamPanel({ input, onGender, onGoal, onWeight, onRatio, onLunchShare, onToggleExtra, onReset }: Props) {
   const goalCfg = GOALS[input.goal]
   const ranges = goalCfg.ranges[input.gender]
@@ -90,18 +116,7 @@ export default function ParamPanel({ input, onGender, onGoal, onWeight, onRatio,
         <div className="mb-1.5 flex items-center justify-between">
           <span className="text-xs text-muted-foreground">体重</span>
           <div className="flex items-center gap-1">
-            <Input
-              type="number"
-              min={40}
-              max={120}
-              step={0.5}
-              value={input.weight}
-              onChange={(e) => {
-                const v = parseFloat(e.target.value)
-                if (!isNaN(v)) onWeight(Math.min(120, Math.max(40, v)))
-              }}
-              className="tnum h-8 w-20 text-right"
-            />
+            <WeightInput weight={input.weight} onWeight={onWeight} />
             <span className="text-xs text-muted-foreground">kg</span>
           </div>
         </div>

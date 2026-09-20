@@ -34,42 +34,52 @@ function SpecCell({ value, onCommit }: { value: string; onCommit: (v: string) =>
   )
 }
 
-function QtyCell({ qty, onCommit }: { qty: number; onCommit: (v: number) => void }) {
-  const [text, setText] = useState(String(qty))
-  useEffect(() => {
-    setText(String(qty))
-  }, [qty])
+export function QtyCell({ qty, onCommit }: { qty: number; onCommit: (v: number) => void }) {
+  // focus-aware raw text：聚焦时原样显示用户输入，blur 时才 parse+夹取+格式化
+  const [draft, setDraft] = useState<string | null>(null)
   return (
     <Input
       inputMode="numeric"
       className="tnum h-8 w-14 text-right"
-      value={text}
+      value={draft ?? String(qty)}
+      onFocus={(e) => setDraft(e.target.value)}
       onChange={(e) => {
-        setText(e.target.value)
-        const v = parseInt(e.target.value, 10)
-        if (!isNaN(v)) onCommit(Math.min(99, Math.max(1, v)))
+        const raw = e.target.value
+        setDraft(raw)
+        const v = parseInt(raw, 10)
+        if (!isNaN(v)) onCommit(Math.min(99, Math.max(1, v))) // 数值实时生效，显示不回写
       }}
-      onBlur={() => setText(String(qty))}
+      onBlur={() => {
+        if (draft === null) return
+        const v = parseInt(draft, 10)
+        if (!isNaN(v)) onCommit(Math.min(99, Math.max(1, v)))
+        setDraft(null)
+      }}
     />
   )
 }
 
-function PriceCell({ price, onCommit }: { price: number; onCommit: (v: number) => void }) {
-  const [text, setText] = useState(price.toFixed(1))
-  useEffect(() => {
-    setText(price.toFixed(1))
-  }, [price])
+export function PriceCell({ price, onCommit }: { price: number; onCommit: (v: number) => void }) {
+  // focus-aware raw text：聚焦时原样显示用户输入（允许 "45." 中间态），blur 时格式化为 2 位小数
+  const [draft, setDraft] = useState<string | null>(null)
   return (
     <Input
       inputMode="decimal"
       className="tnum h-8 w-20 text-right"
-      value={text}
+      value={draft ?? price.toFixed(2)}
+      onFocus={(e) => setDraft(e.target.value)}
       onChange={(e) => {
-        setText(e.target.value)
-        const v = parseFloat(e.target.value)
-        if (!isNaN(v) && v >= 0) onCommit(v)
+        const raw = e.target.value
+        setDraft(raw)
+        const v = parseFloat(raw)
+        if (!isNaN(v) && v >= 0) onCommit(v) // 数值实时生效，显示不回写
       }}
-      onBlur={() => setText(price.toFixed(1))}
+      onBlur={() => {
+        if (draft === null) return
+        const v = parseFloat(draft)
+        if (!isNaN(v) && v >= 0) onCommit(v)
+        setDraft(null)
+      }}
     />
   )
 }
